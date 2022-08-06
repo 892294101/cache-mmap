@@ -97,7 +97,7 @@ func (m *File) Flush() (err error) {
 		return syscall.EINVAL
 	}
 	m.dirty = false
-	err := syscall.FlushViewOfFile(slice.addr, uintptr(slice.len))
+	err = syscall.FlushViewOfFile(slice.addr, uintptr(slice.len))
 	return err
 }
 

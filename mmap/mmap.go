@@ -7,7 +7,9 @@ package mmap
 import (
 	"encoding/binary"
 	"errors"
+	"os"
 	"strings"
+	"sync"
 )
 
 // Prot is the protection flag.
@@ -32,6 +34,7 @@ var (
 )
 
 type File struct {
+	lock   sync.RWMutex
 	data   map[*byte][]byte
 	length int64
 	key    *byte
@@ -42,7 +45,30 @@ func ProtFlags(p Prot) (prot int, flags int) {
 	return protFlags(p)
 }
 
-func NewMmap(fd int, offset int64, length int, p Prot) (*File, error) {
+func validSize(size int64) int64 {
+	pageSize := int64(os.Getpagesize())
+	if size%pageSize == 0 {
+		return size
+	}
+	return (size/pageSize + 1) * pageSize
+}
+
+func NewMmap(f string, size int64) (*File, error) {
+	file, err := os.OpenFile(f, os.O_CREATE|os.O_RDWR, 0775)
+	if err != nil {
+		panic(err)
+	}
+	file.Truncate(validSize(size))
+
+	b, err := openMmap(int(file.Fd()), 0, int(validSize(size)), READ|WRITE)
+	if err != nil {
+		return nil, err
+	}
+	file.Close()
+	return b, nil
+}
+
+func openMmap(fd int, offset int64, length int, p Prot) (*File, error) {
 	prot, flags := ProtFlags(p)
 	return newMmap(fd, offset, length, prot, flags)
 }
@@ -63,6 +89,8 @@ func (m *File) boundaryChecks(offset, numBytes int64) error {
 }
 
 func (m *File) ReadAt(dest []byte, offset int64) (int, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	if err := m.boundaryChecks(offset, int64(len(dest))); err != nil {
 		return 0, err
 	}
@@ -70,6 +98,8 @@ func (m *File) ReadAt(dest []byte, offset int64) (int, error) {
 }
 
 func (m *File) WriteAt(src []byte, offset int64) (int, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.dirty = true
 	if err := m.boundaryChecks(offset, int64(len(src))); err != nil {
 		return 0, err
@@ -78,6 +108,8 @@ func (m *File) WriteAt(src []byte, offset int64) (int, error) {
 }
 
 func (m *File) WriteStringAt(src string, offset int64) (int, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.dirty = true
 	if err := m.boundaryChecks(offset, int64(len(src))); err != nil {
 		return 0, err
@@ -87,6 +119,8 @@ func (m *File) WriteStringAt(src string, offset int64) (int, error) {
 }
 
 func (m *File) ReadStringAt(dest *strings.Builder, offset int64) (int, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	if err := m.boundaryChecks(offset, int64(dest.Len())); err != nil {
 		return 0, err
 	}
@@ -98,20 +132,32 @@ func (m *File) ReadStringAt(dest *strings.Builder, offset int64) (int, error) {
 		end = offset + emptySpace
 	}
 
-	n, _ := dest.Write(m.data[m.key][offset:end])
+	n, err := dest.Write(m.data[m.key][offset:end])
+	if err != nil {
+		return 0, err
+	}
 	return n, nil
 }
 
 // ReadUint64At reads uint64 from offset.
-func (m *File) ReadUint64At(offset int64) uint64 {
-	m.boundaryChecks(offset, 8)
-	return binary.LittleEndian.Uint64(m.data[m.key][offset : offset+8])
+func (m *File) ReadUint64At(offset int64) (uint64, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	if err := m.boundaryChecks(offset, 8); err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(m.data[m.key][offset : offset+8]), nil
 }
 
 // WriteUint64At writes num at offset.
-func (m *File) WriteUint64At(num uint64, offset int64) {
+func (m *File) WriteUint64At(num uint64, offset int64) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.dirty = true
-	m.boundaryChecks(offset, 8)
+	if err := m.boundaryChecks(offset, 8); err != nil {
+		return err
+	}
 	m.dirty = true
 	binary.LittleEndian.PutUint64(m.data[m.key][offset:offset+8], num)
+	return nil
 }
