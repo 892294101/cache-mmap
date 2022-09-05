@@ -34,11 +34,12 @@ var (
 )
 
 type File struct {
-	lock   sync.RWMutex
-	data   map[*byte][]byte
-	length int64
-	key    *byte
-	dirty  bool
+	rawFile *os.File
+	lock    sync.RWMutex
+	data    map[*byte][]byte
+	length  int64
+	key     *byte
+	dirty   bool
 }
 
 func ProtFlags(p Prot) (prot int, flags int) {
@@ -58,24 +59,30 @@ func NewMmap(f string, size int64) (*File, error) {
 	if err != nil {
 		panic(err)
 	}
-	file.Truncate(validSize(size))
 
-	b, err := openMmap(int(file.Fd()), 0, int(validSize(size)), READ|WRITE)
+	if err := file.Truncate(validSize(size)); err != nil {
+		return nil, err
+	}
+
+	b, err := openMmap(file, int(file.Fd()), 0, int(validSize(size)), READ|WRITE)
 	if err != nil {
 		return nil, err
 	}
-	file.Close()
+	if err := b.FLock(); err != nil {
+		return nil, err
+	}
 	return b, nil
 }
 
-func openMmap(fd int, offset int64, length int, p Prot) (*File, error) {
+func openMmap(rawFile *os.File, fd int, offset int64, length int, p Prot) (*File, error) {
 	prot, flags := ProtFlags(p)
-	return newMmap(fd, offset, length, prot, flags)
+	return newMmap(rawFile, fd, offset, length, prot, flags)
 }
 
-func newMmap(fd int, offset int64, length int, prot int, flags int) (*File, error) {
+func newMmap(rawFile *os.File, fd int, offset int64, length int, prot int, flags int) (*File, error) {
 	m := new(File)
 	m.data = make(map[*byte][]byte)
+	m.rawFile = rawFile
 	return m.mmap(fd, offset, length, prot, flags)
 }
 

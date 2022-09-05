@@ -101,6 +101,20 @@ func (m *File) Flush() (err error) {
 	return err
 }
 
+func (m *File) FLock() error {
+	// Windowns 不支持文件锁
+	/*if err := syscall.Flock(int(m.rawFile.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
+		return errors.New(fmt.Sprintf("add checkpoint exclusive lock failed: %v", err))
+	}*/
+	return nil
+}
+
+func (m *File) FUnLock() error {
+	// // Windowns 不支持文件锁
+	// return syscall.Flock(int(m.rawFile.Fd()), syscall.LOCK_UN)
+	return nil
+}
+
 func (m *File) Unmap() (err error) {
 	data := m.data[m.key]
 	if len(data) == 0 || len(data) != cap(data) {
@@ -116,5 +130,6 @@ func (m *File) Unmap() (err error) {
 		return err
 	}
 	delete(m.data, p)
+
 	return nil
 }

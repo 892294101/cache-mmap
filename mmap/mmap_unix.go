@@ -6,6 +6,8 @@
 package mmap
 
 import (
+	"errors"
+	"fmt"
 	"math/rand"
 	"os"
 	"syscall"
@@ -65,6 +67,17 @@ func (m *File) Flush() error {
 	}
 	m.dirty = false
 	return nil
+}
+
+func (m *File) FLock() error {
+	if err := syscall.Flock(int(m.rawFile.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
+		return errors.New(fmt.Sprintf("add checkpoint exclusive lock failed: %v", err))
+	}
+	return nil
+}
+
+func (m *File) FUnLock() error {
+	return syscall.Flock(int(m.rawFile.Fd()), syscall.LOCK_UN)
 }
 
 func (m *File) Unmap() (err error) {
