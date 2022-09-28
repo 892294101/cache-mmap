@@ -54,8 +54,8 @@ func validSize(size int64) int64 {
 	return (size/pageSize + 1) * pageSize
 }
 
-func NewMmap(f string, size int64) (*File, error) {
-	file, err := os.OpenFile(f, os.O_CREATE|os.O_RDWR, 0775)
+func NewMmap(f string, flag int, size int64) (*File, error) {
+	file, err := os.OpenFile(f, flag, 0775)
 	if err != nil {
 		panic(err)
 	}
