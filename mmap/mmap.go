@@ -7,6 +7,7 @@ package mmap
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -68,7 +69,7 @@ func NewMmap(f string, flag int, size int64) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := b.FLock(); err != nil {
+	if err := b.fLock(); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -84,6 +85,16 @@ func newMmap(rawFile *os.File, fd int, offset int64, length int, prot int, flags
 	m.data = make(map[*byte][]byte)
 	m.rawFile = rawFile
 	return m.mmap(fd, offset, length, prot, flags)
+}
+
+func (m *File) Close() error {
+	e1 := m.Flush()
+	e2 := m.unmap()
+	e3 := m.fUnLock()
+	if e1 != nil || e2 != nil || e3 != nil {
+		return errors.New(fmt.Sprintf("flush: %v unmap: %v funlock: %v"))
+	}
+	return nil
 }
 
 func (m *File) boundaryChecks(offset, numBytes int64) error {
