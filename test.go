@@ -19,7 +19,7 @@ func main() {
 		fmt.Println(err)
 	}*/
 
-	b, err := mmap.NewMmap("./test.dat", 128*(1<<17))
+	b, err := mmap.NewMmap("./test.dat", os.O_CREATE|os.O_RDWR, 128*(1<<17))
 	if err != nil {
 		fmt.Println("NewMmap", err)
 		os.Exit(1)
