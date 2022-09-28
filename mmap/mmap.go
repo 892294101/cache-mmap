@@ -57,7 +57,7 @@ func validSize(size int64) int64 {
 func NewMmap(f string, flag int, size int64) (*File, error) {
 	file, err := os.OpenFile(f, flag, 0775)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if err := file.Truncate(validSize(size)); err != nil {
