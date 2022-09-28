@@ -25,7 +25,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() {
-		if err := b.Unmap(); err != nil {
+		if err := b.Close(); err != nil {
 			fmt.Println("unmap error: ", err)
 		}
 	}()
