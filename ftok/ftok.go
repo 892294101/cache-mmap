@@ -1,8 +1,3 @@
-// Copyright (c) 2020 Meng Huang (mhboy@outlook.com)
-// This package is licensed under a MIT license that can be found in the LICENSE file.
-
-// Package ftok provides a way to generate a System V IPC key, suitable for using with
-// msgget, semget, or shmget.
 package ftok
 
 import (
